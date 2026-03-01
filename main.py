@@ -4,7 +4,8 @@ import os
 
 # --- Configuration ---
 chemin_ffmpeg = r"C:\ffmpeg\bin"
-audio_path = "input/sound.wav"
+audio_path_template = "input/Shulker_idle{}.ogg"
+multiple_audio = "124567"
 output_path = "output/result.mp4"
 video_duration = 60 * 60
 occurrences = 10
@@ -14,26 +15,37 @@ os.environ["PATH"] += os.pathsep + chemin_ffmpeg
 
 
 def generate_video():
-    if not os.path.exists(audio_path):
-        print(f"Erreur : Le fichier {audio_path} est introuvable.")
-        return
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    try:
-        probe = ffmpeg.probe(audio_path)
-        audio_info = next(s for s in probe["streams"] if s["codec_type"] == "audio")
-        sound_duration = float(audio_info["duration"])
-    except ffmpeg.Error as e:
-        print("Erreur lors de l'analyse du fichier audio :", e.stderr)
-        return
+    if multiple_audio:
+        audio_paths = [audio_path_template.format(e) for e in multiple_audio]
+    else:
+        audio_paths = [audio_path_template.replace("{}", "")]
 
-    # Calculate required times
-    total_fixed_time = (occurrences * sound_duration) + ((occurrences - 1) * min_gap)
+    available_sounds = {}
+    for p in audio_paths:
+        if not os.path.exists(p):
+            print(f"Erreur : Le fichier {p} est introuvable.")
+            return
+
+        try:
+            probe = ffmpeg.probe(p)
+            audio_info = next(s for s in probe["streams"] if s["codec_type"] == "audio")
+            available_sounds[p] = float(audio_info["duration"])
+        except ffmpeg.Error as e:
+            print("Erreur lors de l'analyse du fichier audio :", e.stderr)
+            return
+
+    chosen_audio_paths = random.choices(list(available_sounds.keys()), k=occurrences)
+    sound_duration_extend = [available_sounds[p] for p in chosen_audio_paths]
+
+    total_fixed_time = sum(sound_duration_extend) + ((occurrences - 1) * min_gap)
     free_time = video_duration - total_fixed_time
-    gap = sound_duration + min_gap
+    gaps = [duration + min_gap for duration in sound_duration_extend]
 
     if free_time < 0:
         if occurrences > 1:
-            max_possible_gap = (video_duration - (occurrences * sound_duration)) / (
+            max_possible_gap = (video_duration - sum(sound_duration_extend)) / (
                 occurrences - 1
             )
             print(
@@ -44,14 +56,12 @@ def generate_video():
             print("Erreur : La vidéo est trop courte pour contenir le son.")
         return
 
-    # Generate random points in the free time space and sort them
     raw_random_times = sorted(
         [random.uniform(0, free_time) for _ in range(occurrences)]
     )
 
-    # Expand the points using the fixed gaps and convert to ms
     delays_ms = [
-        int((raw_random_times[i] + (i * gap)) * 1000) for i in range(occurrences)
+        int((raw_random_times[i] + sum(gaps[:i])) * 1000) for i in range(occurrences)
     ]
 
     print(f"Génération du graphe FFmpeg pour {occurrences} sons...")
@@ -65,20 +75,19 @@ def generate_video():
         f"color=c=black:s=1280x720:d={video_duration}", f="lavfi"
     )
 
-    input_audio = ffmpeg.input(audio_path)
-
-    # Generate base silence of exact video duration
+    input_audios = [ffmpeg.input(p) for p in chosen_audio_paths]
     base_silence = ffmpeg.input("anullsrc", f="lavfi", t=video_duration)
 
-    # Initialize list with the base silence
     audio_streams = [base_silence]
 
-    # Add delayed sounds
-    for delay in delays_ms:
-        delayed = input_audio.filter("adelay", f"{delay}|{delay}")
+    if len(delays_ms) != len(input_audios):
+        print("Erreur : Les gaps ne sont pas autant que les inputs audios.")
+        return
+
+    for i in range(len(delays_ms)):
+        delayed = input_audios[i].filter("adelay", f"{delays_ms[i]}|{delays_ms[i]}")
         audio_streams.append(delayed)
 
-    # Mix silence with delayed sounds
     mixed_audio = ffmpeg.filter(
         audio_streams,
         "amix",
