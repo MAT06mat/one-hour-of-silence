@@ -4,9 +4,10 @@ import os
 # --- Configuration ---
 chemin_ffmpeg = r"C:\ffmpeg\bin"
 video_input_path = "output/result.mp4"
-image_input_path = "input/background.png"
+image_input_path = "input/bg.jpg"
 output_dir = "output"
 video_output_name = "final.mp4"
+crop = True
 bg_color = "white"  # Background color ('white', 'black', '#RRGGBB', etc.)
 
 os.environ["PATH"] += os.pathsep + chemin_ffmpeg
@@ -42,16 +43,29 @@ def add_image_background():
     canvas_w = img_w
     canvas_h = img_h
 
-    if img_w / img_h > target_aspect:
-        canvas_h = int(img_w / target_aspect)
+    # Adjust canvas based on crop mode
+    if crop:
+        if img_w / img_h > target_aspect:
+            canvas_w = int(img_h * target_aspect)
+        else:
+            canvas_h = int(img_w / target_aspect)
     else:
-        canvas_w = int(img_h * target_aspect)
+        if img_w / img_h > target_aspect:
+            canvas_h = int(img_w / target_aspect)
+        else:
+            canvas_w = int(img_h * target_aspect)
 
+    # Cap canvas size to 720p maximum
     if canvas_w > 1280 or canvas_h > 720:
         canvas_w = 1280
         canvas_h = 720
 
-    ratio = min(canvas_w / img_w, canvas_h / img_h)
+    # Determine scaling ratio
+    if crop:
+        ratio = max(canvas_w / img_w, canvas_h / img_h)
+    else:
+        ratio = min(canvas_w / img_w, canvas_h / img_h)
+
     scaled_w = int(img_w * ratio)
     scaled_h = int(img_h * ratio)
 
@@ -71,10 +85,10 @@ def add_image_background():
     input_image = ffmpeg.input(image_input_path, loop=1, framerate=1)
     scaled_image = input_image.filter("scale", scaled_w, scaled_h)
 
-    # Generate a solid color background (this handles both padding and PNG transparency)
+    # Generate a solid color background
     background = ffmpeg.input(f"color=c={bg_color}:s={canvas_w}x{canvas_h}", f="lavfi")
 
-    # Overlay the scaled image onto the background
+    # Overlay the scaled image onto the background (handles cropping automatically via bounds)
     processed_image = ffmpeg.filter(
         [background, scaled_image], "overlay", x="(W-w)/2", y="(H-h)/2"
     )

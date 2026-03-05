@@ -4,12 +4,12 @@ import os
 
 # --- Configuration ---
 chemin_ffmpeg = r"C:\ffmpeg\bin"
-audio_path_template = "input/Shulker_idle{}.ogg"
-multiple_audio = "124567"
+audio_path_template = "input/J{}.wav"
+multiple_audio = "5607243"
 output_path = "output/result.mp4"
 video_duration = 60 * 60
-occurrences = 10
-min_gap = 10
+occurrences = 14
+min_gap = 60
 
 os.environ["PATH"] += os.pathsep + chemin_ffmpeg
 
@@ -36,7 +36,8 @@ def generate_video():
             print("Erreur lors de l'analyse du fichier audio :", e.stderr)
             return
 
-    chosen_audio_paths = random.choices(list(available_sounds.keys()), k=occurrences)
+    sound_keys = list(available_sounds.keys())
+    chosen_audio_paths = [sound_keys[i % len(sound_keys)] for i in range(occurrences)]
     sound_duration_extend = [available_sounds[p] for p in chosen_audio_paths]
 
     total_fixed_time = sum(sound_duration_extend) + ((occurrences - 1) * min_gap)
