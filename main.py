@@ -4,8 +4,9 @@ import os
 
 # --- Configuration ---
 chemin_ffmpeg = r"C:\ffmpeg\bin"
-audio_path_template = "input/J{}.wav"
-multiple_audio = "5607243"
+audio_path_template = "input/t{}.wav"
+multiple_audio = "13a5867294bc"
+random_order = True
 output_path = "output/result.mp4"
 video_duration = 60 * 60
 occurrences = 14
@@ -16,6 +17,9 @@ os.environ["PATH"] += os.pathsep + chemin_ffmpeg
 
 def generate_video():
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    if random_order:
+        random.shuffle(multiple_audio)
 
     if multiple_audio:
         audio_paths = [audio_path_template.format(e) for e in multiple_audio]
