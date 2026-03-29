@@ -6,7 +6,7 @@ chemin_ffmpeg = r"C:\ffmpeg\bin"
 video_input_path = "output/result.mp4"
 image_input_path = "input/bg.jpg"
 output_dir = "output"
-video_output_name = "final.mp4"
+video_output_name = "1h of silence occasionally interrupted by.mp4"
 crop = True
 bg_color = "white"  # Background color ('white', 'black', '#RRGGBB', etc.)
 
